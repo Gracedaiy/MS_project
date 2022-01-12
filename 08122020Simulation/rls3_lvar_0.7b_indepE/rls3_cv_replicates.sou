@@ -1,0 +1,11 @@
+qsub \
+ -N sim_dy \
+ -S /bin/bash \
+ -cwd \
+ -o rls3_cv_replicates.out \
+ -j y \
+ -q shared.q \
+ -pe orte 1 \
+ -V \
+ -t 1 \
+ -b y $PWD/rls3_cv_replicates.sh

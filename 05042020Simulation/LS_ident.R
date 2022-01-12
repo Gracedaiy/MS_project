@@ -1,0 +1,122 @@
+# Used library
+library(mvtnorm)
+library(expm)
+library(MASS)
+library(tidyverse)
+set.seed(120733)
+
+
+LS.est <- function(X, Y) {
+  Clhat <- ginv(t(X)%*%X)%*%t(X)%*% Y
+  return(Clhat)
+}
+
+# function to generate a random orthonormal matrix
+rortho <- function(x){
+  return(qr.Q(qr(array(runif(x), dim = c(x,x)))))
+}
+
+# simulation settings
+# sample size n (n person's data have been taken)
+n <- 1000
+
+# number of metabolites
+m <- 100
+
+# number of taxa
+k <- 40
+
+# rank of matrix B
+r <- 10
+
+
+# Generate X from Multivariate Noromal with identity variance and covariance matrix
+X <- matrix(rnorm(m*n), nrow = m, ncol = n)
+
+# Generate low-rank matrix B
+sing.vals <- 5*((r:1)/r + 1/r)
+B <- rortho(k)[,1:r] %*% diag(sing.vals) %*% rortho(m)[1:r,]
+
+# Generate T vector from Unif(0, 10)
+T <- matrix(runif(n, min = 0, max = 10), nrow = 1)
+
+# Generate random error
+E <- matrix(rnorm(k*n), nrow = k, ncol = n)
+
+# Calculate our new Z = XB + 1T + E
+Z <- B %*% X + matrix(rep(1, k), ncol = 1) %*% T + E
+
+# convergence criterion
+vareps <- 10^(-3)
+
+
+
+
+disT <- 1
+disB <- 1
+disXB <- 1
+iter.count <- 1
+
+# Randomize T from same distribution
+T_iter <- matrix(runif(n, min = 0,  max = 10), nrow = 1)
+T_iter <- T_iter - mean(T_iter)
+
+# Ramdomize T from different distribution
+# T_iter <- matrix(rnorm(n, mean = 2,  sd = 3), nrow = 1)
+# T_iter <- T_iter - mean(T_iter)
+# 
+# Cneter True T
+# T_iter <- T - mean(T)
+
+Z_iter <- t(Z) - t(T_iter) %*% t(matrix(rep(1, k), ncol = 1))
+B_iter <- LS.est(t(X), Z_iter)
+
+while ((((disB > vareps) || (disT > vareps))  && ((disXB > vareps) || (disT > vareps))) && (iter.count < 3000)) {
+  T_iter_next <- matrix(rowMeans(t(Z) - t(X) %*% B_iter), nrow = 1)
+  # T_iter_next <- T
+  
+  Z_iter <- t(Z) - t(T_iter_next) %*% t(matrix(rep(1, k), ncol = 1))
+  B_iter_next <- LS.est(t(X), Z_iter)
+  # B_iter_next_rank <- sum(svd(B_iter_next)$d > 10^(-16))
+  # B_iter_next <- t(B)
+  
+  disT <- sum((T_iter - T_iter_next)^2)
+  disB <- sum((B_iter - B_iter_next)^2)
+  disXB <- sum((t(B_iter) %*% X - t(B_iter_next) %*% X)^2)
+  
+  Z.est <-  t(B_iter) %*% X + matrix(rep(1, k), ncol = 1) %*% T_iter
+  B_iter <- B_iter_next
+  T_iter <- T_iter_next
+  iter.count <- iter.count + 1
+  # print(iter.count)
+  print(T_iter[1:10])
+}
+# rank.est[i] <- B_iter_next_rank
+converge.iter <- iter.count
+
+num_LS <- 1/2 * sum((t(Z) - t(X) %*% B_iter - t(T_iter) %*% matrix(rep(1, k), nrow = 1))^2)
+
+# # save image for B matrix
+# png(paste0("plot-B-CenterRMT(norm).png"))
+# plot(B, B_iter)
+# dev.off()
+# 
+# # save image for T matrix
+# png(paste0("plot-T-CenterRMT2(norm).png"))
+# plot(T, T_iter)
+# abline(a = 0, b = 1)
+# dev.off()
+# 
+# # save image for XB matrix
+# png(paste0("plot-XB-CenterRMT2(norm).png"))
+# plot(B %*% X, t(B_iter) %*% X)
+# abline(a = 0, b = 1)
+# dev.off()
+# 
+# # save image for Z matrix
+# png(paste0("plot-Z-CenterRMT2(norm).png"))
+# plot(Z, Z.est)
+# abline(a = 0, b = 1)
+# dev.off()
+
+  
